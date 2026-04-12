@@ -6,7 +6,14 @@ import AppLayout from '../layouts/AppLayout';
 import StatCard from '../components/StatCard';
 import StatusBadge from '../components/StatusBadge';
 import { PageSpinner } from '../components/Spinner';
-import { formatCurrency, formatDate, CATEGORY_ICONS, capitalize } from '../utils/helpers';
+import {
+  formatCurrency,
+  formatDate,
+  CATEGORY_ICONS,
+  capitalize,
+  hasReimbursementReceipt,
+} from '../utils/helpers';
+import ReceiptCell from '../components/ReceiptCell';
 
 const ManagerDashboard = () => {
   const dispatch = useDispatch();
@@ -127,6 +134,11 @@ const ManagerDashboard = () => {
                   </div>
                   <p className="text-xs text-surface-500 truncate">{item.description}</p>
                 </div>
+                {hasReimbursementReceipt(item) && (
+                  <div className="flex-shrink-0 scale-90 origin-center">
+                    <ReceiptCell item={item} />
+                  </div>
+                )}
                 <div className="text-right flex-shrink-0 mr-2">
                   <p className="font-mono font-700 text-surface-900">{formatCurrency(item.amount)}</p>
                   <p className="text-xs text-surface-400">{formatDate(item.date)}</p>

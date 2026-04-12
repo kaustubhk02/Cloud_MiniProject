@@ -1,3 +1,18 @@
+import api from '../services/api';
+
+/** Opens receipt in a new tab (presigned S3 or local/proxied URL). */
+export async function openReimbursementReceipt(id) {
+  const { data } = await api.get(`/reimbursements/${id}/receipt`);
+  if (data?.url) {
+    window.open(data.url, '_blank', 'noopener,noreferrer');
+    return;
+  }
+  throw new Error(data?.message || 'Could not open receipt');
+}
+
+export const hasReimbursementReceipt = (item) =>
+  Boolean(item?.receiptUrl || item?.receiptKey || item?.receipt_url || item?.receipt_key);
+
 // Format currency in INR or USD
 export const formatCurrency = (amount, currency = 'INR') => {
   return new Intl.NumberFormat('en-IN', {

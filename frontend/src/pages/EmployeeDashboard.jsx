@@ -6,7 +6,15 @@ import AppLayout from '../layouts/AppLayout';
 import StatCard from '../components/StatCard';
 import StatusBadge from '../components/StatusBadge';
 import { PageSpinner } from '../components/Spinner';
-import { formatCurrency, formatDate, CATEGORY_ICONS, capitalize } from '../utils/helpers';
+import {
+  formatCurrency,
+  formatDate,
+  CATEGORY_ICONS,
+  capitalize,
+  hasReimbursementReceipt,
+  openReimbursementReceipt,
+} from '../utils/helpers';
+import toast from 'react-hot-toast';
 
 const EmployeeDashboard = () => {
   const dispatch = useDispatch();
@@ -121,6 +129,21 @@ const EmployeeDashboard = () => {
                 <div className="flex-1 min-w-0">
                   <p className="font-500 text-surface-800 truncate">{item.description}</p>
                   <p className="text-xs text-surface-400 mt-0.5">{capitalize(item.category)} · {formatDate(item.date)}</p>
+                  {hasReimbursementReceipt(item) && (
+                    <button
+                      type="button"
+                      className="text-[10px] text-brand-600 font-600 mt-0.5"
+                      onClick={async () => {
+                        try {
+                          await openReimbursementReceipt(item._id);
+                        } catch {
+                          toast.error('Could not open receipt');
+                        }
+                      }}
+                    >
+                      Receipt
+                    </button>
+                  )}
                 </div>
                 <div className="text-right flex-shrink-0">
                   <p className="font-600 font-mono text-surface-900">{formatCurrency(item.amount)}</p>

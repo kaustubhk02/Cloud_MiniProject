@@ -1,25 +1,32 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
-import { createReimbursement, updateReimbursement, fetchReimbursements } from '../redux/slices/reimbursementsSlice';
+import {
+  createReimbursement,
+  updateReimbursement,
+  fetchReimbursements,
+  deleteReceiptAttachment,
+  fetchManagers,
+} from '../redux/slices/reimbursementsSlice';
 import toast from 'react-hot-toast';
 import AppLayout from '../layouts/AppLayout';
 import Spinner from '../components/Spinner';
-import { CATEGORIES } from '../utils/helpers';
+import { CATEGORIES, openReimbursementReceipt, hasReimbursementReceipt } from '../utils/helpers';
 
 const SubmitRequest = () => {
   const { id } = useParams(); // id means edit mode
   const dispatch = useDispatch();
   const navigate = useNavigate();
-  const { actionLoading, items } = useSelector((s) => s.reimbursements);
+  const { actionLoading, items, managers, managersLoading } = useSelector((s) => s.reimbursements);
 
-  const existingItem = id ? items.find((i) => i._id === id) : null;
+  const existingItem = id ? items.find((i) => String(i._id) === String(id)) : null;
 
   const [form, setForm] = useState({
     amount: '',
     category: 'travel',
     description: '',
     date: new Date().toISOString().split('T')[0],
+    assignedManagerId: '',
   });
   const [file, setFile] = useState(null);
   const [errors, setErrors] = useState({});
@@ -33,9 +40,14 @@ const SubmitRequest = () => {
         category: existingItem.category,
         description: existingItem.description,
         date: new Date(existingItem.date).toISOString().split('T')[0],
+        assignedManagerId: existingItem.assignedManagerId != null ? String(existingItem.assignedManagerId) : '',
       });
     }
   }, [existingItem]);
+
+  useEffect(() => {
+    dispatch(fetchManagers());
+  }, [dispatch]);
 
   // If editing but item not loaded yet, fetch
   useEffect(() => {
@@ -50,6 +62,7 @@ const SubmitRequest = () => {
     if (!form.category) e.category = 'Category is required';
     if (!form.description || form.description.trim().length < 10) e.description = 'Description must be at least 10 characters';
     if (!form.date) e.date = 'Date is required';
+    if (!form.assignedManagerId) e.assignedManager = 'Choose a manager who will review this request';
     setErrors(e);
     return Object.keys(e).length === 0;
   };
@@ -63,7 +76,8 @@ const SubmitRequest = () => {
     fd.append('category', form.category);
     fd.append('description', form.description);
     fd.append('date', form.date);
-    if (file) fd.append('attachment', file);
+    fd.append('assigned_manager_id', form.assignedManagerId);
+    if (file) fd.append('receipt', file);
 
     let result;
     if (id) {
@@ -107,6 +121,30 @@ const SubmitRequest = () => {
         </div>
 
         <form onSubmit={handleSubmit} className="card p-6 space-y-6" noValidate>
+          {/* Assigned manager */}
+          <div>
+            <label className="label">Reviewing manager</label>
+            <p className="text-xs text-surface-500 mb-2">Only this manager will see and approve or reject this request.</p>
+            {managersLoading ? (
+              <div className="py-2"><Spinner size="sm" /></div>
+            ) : (
+              <select
+                className={`input ${errors.assignedManager ? 'input-error' : ''}`}
+                value={form.assignedManagerId}
+                onChange={(e) => setForm({ ...form, assignedManagerId: e.target.value })}
+                required
+              >
+                <option value="">Select a manager…</option>
+                {managers.map((m) => (
+                  <option key={m.id} value={m.id}>
+                    {m.name} ({m.email})
+                  </option>
+                ))}
+              </select>
+            )}
+            {errors.assignedManager && <p className="text-red-500 text-xs mt-1">{errors.assignedManager}</p>}
+          </div>
+
           {/* Amount */}
           <div>
             <label className="label">Amount (₹)</label>
@@ -180,6 +218,35 @@ const SubmitRequest = () => {
           {/* File Upload */}
           <div>
             <label className="label">Attachment <span className="text-surface-400 font-400">(optional)</span></label>
+            {id && existingItem && hasReimbursementReceipt(existingItem) && !file && (
+              <div className="flex flex-wrap items-center gap-2 mb-3">
+                <button
+                  type="button"
+                  className="text-xs btn-secondary px-3 py-1.5"
+                  onClick={async () => {
+                    try {
+                      await openReimbursementReceipt(existingItem._id);
+                    } catch {
+                      toast.error('Could not open receipt');
+                    }
+                  }}
+                >
+                  View current receipt
+                </button>
+                <button
+                  type="button"
+                  className="text-xs text-red-600 hover:text-red-700 font-600 px-2"
+                  disabled={actionLoading}
+                  onClick={async () => {
+                    const r = await dispatch(deleteReceiptAttachment(existingItem._id));
+                    if (deleteReceiptAttachment.fulfilled.match(r)) toast.success('Attachment removed');
+                    else toast.error(r.payload || 'Failed to remove');
+                  }}
+                >
+                  Remove attachment
+                </button>
+              </div>
+            )}
             <div
               onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
               onDragLeave={() => setDragOver(false)}
@@ -192,7 +259,7 @@ const SubmitRequest = () => {
                 id="file-input"
                 type="file"
                 className="hidden"
-                accept=".jpg,.jpeg,.png,.gif,.pdf,.doc,.docx"
+                accept=".jpg,.jpeg,.png,.pdf"
                 onChange={(e) => setFile(e.target.files[0])}
               />
               {file ? (
@@ -213,11 +280,11 @@ const SubmitRequest = () => {
                   <p className="text-sm text-surface-500">
                     Drag & drop or <span className="text-brand-600 font-600">browse</span>
                   </p>
-                  <p className="text-xs text-surface-400 mt-1">JPG, PNG, PDF, DOC up to 5MB</p>
+                  <p className="text-xs text-surface-400 mt-1">JPG, PNG, PDF up to 5MB</p>
                 </>
               )}
-              {existingItem?.attachment && !file && (
-                <p className="text-xs text-emerald-600 mt-2">✓ Existing attachment will be kept</p>
+              {id && existingItem && hasReimbursementReceipt(existingItem) && !file && (
+                <p className="text-xs text-emerald-600 mt-2">✓ Upload a new file below to replace the current receipt</p>
               )}
             </div>
           </div>

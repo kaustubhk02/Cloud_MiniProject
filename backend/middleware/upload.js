@@ -1,41 +1,63 @@
-const multer = require('multer');
-const path = require('path');
-const fs = require('fs');
+// const { S3Client }  = require('@aws-sdk/client-s3');
+// const multer         = require('multer');
+// const multerS3       = require('multer-s3');
+// const path           = require('path');
 
-// Ensure uploads directory exists
-const uploadDir = path.join(__dirname, '../uploads');
-if (!fs.existsSync(uploadDir)) {
-  fs.mkdirSync(uploadDir, { recursive: true });
-}
+// // ── S3 Client ────────────────────────────────────────────
+// // Uses env vars (AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, AWS_REGION)
+// // On EC2 with IAM Role attached, credentials are picked up automatically
+// const s3 = new S3Client({
+//   region: process.env.AWS_REGION || 'ap-south-1',
+//   ...(process.env.AWS_ACCESS_KEY_ID && {
+//     credentials: {
+//       accessKeyId:     process.env.AWS_ACCESS_KEY_ID,
+//       secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
+//     },
+//   }),
+// });
 
-// Configure storage
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    cb(null, uploadDir);
-  },
-  filename: (req, file, cb) => {
-    const uniqueSuffix = `${Date.now()}-${Math.round(Math.random() * 1e9)}`;
-    const ext = path.extname(file.originalname);
-    cb(null, `attachment-${uniqueSuffix}${ext}`);
-  },
-});
+// // ── Allowed File Types ───────────────────────────────────
+// const allowedMimeTypes = [
+//   'image/jpeg',
+//   'image/jpg',
+//   'image/png',
+//   'image/gif',
+//   'application/pdf',
+//   'application/msword',
+//   'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+// ];
 
-// File filter
-const fileFilter = (req, file, cb) => {
-  const allowedTypes = /jpeg|jpg|png|gif|pdf|doc|docx/;
-  const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
-  const mimetype = allowedTypes.test(file.mimetype);
+// const allowedExtensions = /jpeg|jpg|png|gif|pdf|doc|docx/;
 
-  if (extname && mimetype) {
-    return cb(null, true);
-  }
-  cb(new Error('Only images (JPEG, PNG, GIF) and documents (PDF, DOC, DOCX) are allowed'));
-};
+// const fileFilter = (req, file, cb) => {
+//   const extOk  = allowedExtensions.test(path.extname(file.originalname).toLowerCase());
+//   const mimeOk = allowedMimeTypes.includes(file.mimetype);
 
-const upload = multer({
-  storage,
-  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB limit
-  fileFilter,
-});
+//   if (extOk && mimeOk) {
+//     cb(null, true);
+//   } else {
+//     cb(new Error('Only images (JPEG, PNG, GIF) and documents (PDF, DOC, DOCX) are allowed'));
+//   }
+// };
 
-module.exports = upload;
+// // ── Multer-S3 Storage ────────────────────────────────────
+// const storage = multerS3({
+//   s3,
+//   bucket: process.env.S3_BUCKET_NAME,
+//   contentType: multerS3.AUTO_CONTENT_TYPE,
+//   key: (req, file, cb) => {
+//     // Unique filename: receipts/timestamp-random.ext
+//     const uniqueSuffix = `${Date.now()}-${Math.round(Math.random() * 1e9)}`;
+//     const ext          = path.extname(file.originalname).toLowerCase();
+//     cb(null, `receipts/attachment-${uniqueSuffix}${ext}`);
+//   },
+// });
+
+// // ── Export upload middleware ─────────────────────────────
+// const upload = multer({
+//   storage,
+//   limits:     { fileSize: 5 * 1024 * 1024 }, // 5 MB
+//   fileFilter,
+// });
+
+// module.exports = upload;

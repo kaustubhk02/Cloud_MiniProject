@@ -1,50 +1,25 @@
-/**
- * Global error handler middleware
- */
 const errorHandler = (err, req, res, next) => {
-  let statusCode = err.statusCode || 500;
-  let message = err.message || 'Internal Server Error';
+console.error('ERROR:', err.message);
 
-  // Mongoose CastError (invalid ObjectId)
-  if (err.name === 'CastError') {
-    statusCode = 404;
-    message = 'Resource not found';
+  // Multer file size error
+  if (err.code === 'LIMIT_FILE_SIZE') {
+    return res.status(400).json({ success: false, message: 'File too large. Max size is 5MB.' });
   }
 
-  // Mongoose Duplicate key error
-  if (err.code === 11000) {
-    statusCode = 400;
-    const field = Object.keys(err.keyValue)[0];
-    message = `${field.charAt(0).toUpperCase() + field.slice(1)} already exists`;
+  // Multer file type error
+  if (err.message && err.message.includes('Only JPEG')) {
+    return res.status(400).json({ success: false, message: err.message });
   }
 
-  // Mongoose validation error
-  if (err.name === 'ValidationError') {
-    statusCode = 400;
-    message = Object.values(err.errors)
-      .map((val) => val.message)
-      .join(', ');
+  // MySQL duplicate entry
+  if (err.code === 'ER_DUP_ENTRY') {
+    return res.status(400).json({ success: false, message: 'Email already registered.' });
   }
 
-  // JWT errors
-  if (err.name === 'JsonWebTokenError') {
-    statusCode = 401;
-    message = 'Invalid token';
-  }
-
-  if (err.name === 'TokenExpiredError') {
-    statusCode = 401;
-    message = 'Token expired';
-  }
-
-  if (process.env.NODE_ENV === 'development') {
-    console.error('Error:', err);
-  }
-
+  const statusCode = res.statusCode !== 200 ? res.statusCode : 500;
   res.status(statusCode).json({
     success: false,
-    message,
-    ...(process.env.NODE_ENV === 'development' && { stack: err.stack }),
+    message: err.message || 'Internal Server Error',
   });
 };
 

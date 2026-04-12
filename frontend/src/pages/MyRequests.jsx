@@ -9,7 +9,14 @@ import FilterBar from '../components/FilterBar';
 import Pagination from '../components/Pagination';
 import ConfirmModal from '../components/ConfirmModal';
 import { PageSpinner } from '../components/Spinner';
-import { formatCurrency, formatDate, CATEGORY_ICONS, capitalize } from '../utils/helpers';
+import {
+  formatCurrency,
+  formatDate,
+  CATEGORY_ICONS,
+  capitalize,
+  hasReimbursementReceipt,
+  openReimbursementReceipt,
+} from '../utils/helpers';
 
 const MyRequests = () => {
   const dispatch = useDispatch();
@@ -77,7 +84,7 @@ const MyRequests = () => {
               <table className="w-full">
                 <thead className="bg-surface-50 border-b border-surface-100">
                   <tr>
-                    {['Category', 'Description', 'Amount', 'Date', 'Status', 'Actions'].map((h) => (
+                    {['Category', 'Manager', 'Description', 'Receipt', 'Amount', 'Date', 'Status', 'Actions'].map((h) => (
                       <th key={h} className="px-5 py-3.5 text-left text-xs font-600 text-surface-500 uppercase tracking-wider">
                         {h}
                       </th>
@@ -93,10 +100,33 @@ const MyRequests = () => {
                           <span className="text-sm font-500 text-surface-700 capitalize">{capitalize(item.category)}</span>
                         </div>
                       </td>
+                      <td className="px-5 py-4 max-w-[140px]">
+                        <p className="text-sm text-surface-700 truncate">{item.assignedManager?.name || '—'}</p>
+                        <p className="text-xs text-surface-400 truncate">{item.assignedManager?.email || ''}</p>
+                      </td>
                       <td className="px-5 py-4 max-w-[200px]">
                         <p className="text-sm text-surface-700 truncate">{item.description}</p>
                         {item.managerComments && (
                           <p className="text-xs text-surface-400 mt-0.5 italic truncate">"{item.managerComments}"</p>
+                        )}
+                      </td>
+                      <td className="px-5 py-4 whitespace-nowrap">
+                        {hasReimbursementReceipt(item) ? (
+                          <button
+                            type="button"
+                            className="text-xs text-brand-600 hover:text-brand-700 font-600"
+                            onClick={async () => {
+                              try {
+                                await openReimbursementReceipt(item._id);
+                              } catch {
+                                toast.error('Could not open receipt');
+                              }
+                            }}
+                          >
+                            View
+                          </button>
+                        ) : (
+                          <span className="text-xs text-surface-400">—</span>
                         )}
                       </td>
                       <td className="px-5 py-4">
@@ -108,7 +138,7 @@ const MyRequests = () => {
                         {item.status === 'pending' && (
                           <div className="flex gap-2">
                             <Link
-                              to={`/submit/${item._id}`}
+                              to={`/submit/${String(item._id)}`}
                               className="text-xs btn-secondary px-2 py-1"
                             >
                               Edit
@@ -141,6 +171,24 @@ const MyRequests = () => {
                     <StatusBadge status={item.status} />
                   </div>
                   <p className="text-sm text-surface-600 mb-2 line-clamp-2">{item.description}</p>
+                  <p className="text-xs text-surface-500 mb-2">
+                    Manager: <span className="font-600">{item.assignedManager?.name || '—'}</span>
+                  </p>
+                  {hasReimbursementReceipt(item) && (
+                    <button
+                      type="button"
+                      className="text-xs text-brand-600 font-600 mb-2"
+                      onClick={async () => {
+                        try {
+                          await openReimbursementReceipt(item._id);
+                        } catch {
+                          toast.error('Could not open receipt');
+                        }
+                      }}
+                    >
+                      View receipt
+                    </button>
+                  )}
                   <div className="flex items-center justify-between">
                     <div>
                       <p className="font-mono font-700 text-surface-900">{formatCurrency(item.amount)}</p>
@@ -148,7 +196,7 @@ const MyRequests = () => {
                     </div>
                     {item.status === 'pending' && (
                       <div className="flex gap-2">
-                        <Link to={`/submit/${item._id}`} className="text-xs btn-secondary px-2 py-1">Edit</Link>
+                        <Link to={`/submit/${String(item._id)}`} className="text-xs btn-secondary px-2 py-1">Edit</Link>
                         <button onClick={() => setDeleteId(item._id)} className="text-xs btn-danger px-2 py-1">Delete</button>
                       </div>
                     )}

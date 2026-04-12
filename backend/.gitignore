@@ -1,6 +1,31 @@
+# Dependencies
 node_modules/
+
+# Environment variables — NEVER commit these
 .env
-uploads/
+.env.local
+.env.production
+.env.development
+
+# Build output
 dist/
 build/
+
+# Logs
+logs/
 *.log
+npm-debug.log*
+
+# OS
+.DS_Store
+Thumbs.db
+
+# AWS key files
+*.pem
+
+# Uploaded files (local dev only)
+uploads/
+
+# IDE
+.vscode/
+.idea/

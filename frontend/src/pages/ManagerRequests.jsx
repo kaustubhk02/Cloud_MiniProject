@@ -11,7 +11,15 @@ import StatusBadge from '../components/StatusBadge';
 import FilterBar from '../components/FilterBar';
 import Pagination from '../components/Pagination';
 import Spinner, { PageSpinner } from '../components/Spinner';
-import { formatCurrency, formatDate, CATEGORY_ICONS, capitalize } from '../utils/helpers';
+import ReceiptCell from '../components/ReceiptCell';
+import {
+  formatCurrency,
+  formatDate,
+  CATEGORY_ICONS,
+  capitalize,
+  hasReimbursementReceipt,
+  openReimbursementReceipt,
+} from '../utils/helpers';
 
 const ActionModal = ({ item, action, onClose, onConfirm, loading }) => {
   const [comment, setComment] = useState('');
@@ -34,6 +42,21 @@ const ActionModal = ({ item, action, onClose, onConfirm, loading }) => {
         <div className="bg-surface-50 rounded-xl p-3 mb-4 text-sm text-surface-600">
           <p className="font-500 mb-1">{capitalize(item.category)}</p>
           <p className="text-surface-500">{item.description}</p>
+          {hasReimbursementReceipt(item) && (
+            <button
+              type="button"
+              className="mt-2 text-xs text-brand-600 font-600 hover:text-brand-700"
+              onClick={async () => {
+                try {
+                  await openReimbursementReceipt(item._id);
+                } catch {
+                  toast.error('Could not open receipt');
+                }
+              }}
+            >
+              Open receipt
+            </button>
+          )}
         </div>
 
         <div className="mb-5">
@@ -105,7 +128,7 @@ const ManagerRequests = () => {
       {/* Header */}
       <div className="mb-6">
         <h1 className="page-title">All Requests</h1>
-        <p className="text-surface-500 mt-1">Review, approve, or reject employee reimbursement requests.</p>
+        <p className="text-surface-500 mt-1">Requests assigned to you by employees. Approve or reject from here.</p>
       </div>
 
       {/* Filters */}
@@ -130,7 +153,7 @@ const ManagerRequests = () => {
               <table className="w-full">
                 <thead className="bg-surface-50 border-b border-surface-100">
                   <tr>
-                    {['Employee', 'Category', 'Description', 'Amount', 'Date', 'Status', 'Actions'].map((h) => (
+                    {['Employee', 'Category', 'Description', 'Receipt', 'Amount', 'Date', 'Status', 'Actions'].map((h) => (
                       <th key={h} className="px-5 py-3.5 text-left text-xs font-600 text-surface-500 uppercase tracking-wider">
                         {h}
                       </th>
@@ -157,6 +180,9 @@ const ManagerRequests = () => {
                         {item.managerComments && (
                           <p className="text-xs text-surface-400 italic truncate">"{item.managerComments}"</p>
                         )}
+                      </td>
+                      <td className="px-5 py-4 align-top">
+                        <ReceiptCell item={item} />
                       </td>
                       <td className="px-5 py-4">
                         <span className="font-mono font-700 text-surface-900">{formatCurrency(item.amount)}</span>
@@ -212,6 +238,11 @@ const ManagerRequests = () => {
                     <span className="font-mono font-700 text-surface-900">{formatCurrency(item.amount)}</span>
                   </div>
                   <p className="text-sm text-surface-500 line-clamp-2">{item.description}</p>
+                  {hasReimbursementReceipt(item) && (
+                    <div className="flex items-center gap-2">
+                      <ReceiptCell item={item} />
+                    </div>
+                  )}
                   {item.managerComments && (
                     <p className="text-xs text-surface-400 italic">Comment: "{item.managerComments}"</p>
                   )}
