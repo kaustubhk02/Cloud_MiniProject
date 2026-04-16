@@ -11,7 +11,7 @@ const allowedOrigins = new Set(
   [
     'http://localhost:5173',
     'http://127.0.0.1:5173',
-'http://3.110.33.11:3000',
+    'http://3.110.33.11:3000',
     process.env.CLIENT_URL,
   ].filter(Boolean)
 );

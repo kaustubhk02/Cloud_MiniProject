@@ -54,7 +54,7 @@ const ActionModal = ({ item, action, onClose, onConfirm, loading }) => {
                 }
               }}
             >
-              Open receipt
+              View / Download receipt
             </button>
           )}
         </div>

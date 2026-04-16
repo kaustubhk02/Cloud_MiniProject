@@ -23,6 +23,17 @@ function managerCanAccessRow(row, managerUserId) {
   );
 }
 
+function extractReceiptFromUpload(file) {
+  if (!file) return { receiptUrl: null, receiptKey: null };
+  if (file.location) {
+    return { receiptUrl: file.location, receiptKey: file.key };
+  }
+  if (file.filename) {
+    return { receiptUrl: `/uploads/${file.filename}`, receiptKey: file.filename };
+  }
+  return { receiptUrl: null, receiptKey: null };
+}
+
 async function validateManagerId(managerIdRaw) {
   const mid = parseInt(String(managerIdRaw), 10);
   if (Number.isNaN(mid) || mid < 1) return null;
@@ -262,26 +273,24 @@ router.post('/', protect, restrictTo('employee'), upload.single('receipt'), asyn
       return res.status(400).json({ success: false, message: 'Select a valid manager to review this request.' });
     }
 
-    let receiptUrl = null;
-    let receiptKey = null;
-    if (req.file) {
-      if (req.file.location) {
-        receiptUrl = req.file.location;
-        receiptKey = req.file.key;
-      } else if (req.file.filename) {
-        receiptUrl = `/uploads/${req.file.filename}`;
-        receiptKey = req.file.filename;
-      }
-    }
+    const { receiptUrl, receiptKey } = extractReceiptFromUpload(req.file);
 
-    const [result] = await pool.query(
-      `
-      INSERT INTO reimbursements
-        (user_id, assigned_manager_id, amount, category, description, date, receipt_url, receipt_key, status)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending')
-    `,
-      [req.user.id, managerId, amount, category, description, date, receiptUrl, receiptKey]
-    );
+    let result;
+    try {
+      [result] = await pool.query(
+        `
+        INSERT INTO reimbursements
+          (user_id, assigned_manager_id, amount, category, description, date, receipt_url, receipt_key, status)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending')
+      `,
+        [req.user.id, managerId, amount, category, description, date, receiptUrl, receiptKey]
+      );
+    } catch (dbErr) {
+      if (receiptKey || receiptUrl) {
+        await removeStoredReceipt({ receipt_key: receiptKey, receipt_url: receiptUrl });
+      }
+      throw dbErr;
+    }
 
     const data = await selectOneWithJoins(result.insertId);
     res.status(201).json({ success: true, data });
@@ -333,11 +342,11 @@ router.delete('/:id/receipt', protect, restrictTo('employee'), async (req, res, 
     if (row.status !== 'pending') {
       return res.status(400).json({ success: false, message: 'Only pending requests can be edited.' });
     }
-    await removeStoredReceipt({ receipt_key: row.receipt_key, receipt_url: row.receipt_url });
     await pool.query(
       'UPDATE reimbursements SET receipt_url = NULL, receipt_key = NULL WHERE id = ?',
       [req.params.id]
     );
+    await removeStoredReceipt({ receipt_key: row.receipt_key, receipt_url: row.receipt_url });
     const data = await selectOneWithJoins(req.params.id);
     res.json({ success: true, data });
   } catch (err) {
@@ -402,6 +411,8 @@ router.put('/:id', protect, restrictTo('employee'), upload.single('receipt'), as
     let receiptUrl = existing.receipt_url;
     let receiptKey = existing.receipt_key;
     let assignedManagerId = existing.assigned_manager_id;
+    let oldReceiptToDelete = null;
+    let uploadedReceiptToRollback = null;
 
     if (assigned_manager_id !== undefined && assigned_manager_id !== null && String(assigned_manager_id).trim() !== '') {
       const mid = await validateManagerId(assigned_manager_id);
@@ -414,29 +425,46 @@ router.put('/:id', protect, restrictTo('employee'), upload.single('receipt'), as
     const stripReceipt = remove_receipt === 'true' || remove_receipt === true;
 
     if (req.file) {
-      await removeStoredReceipt({ receipt_key: existing.receipt_key, receipt_url: existing.receipt_url });
-      if (req.file.location) {
-        receiptUrl = req.file.location;
-        receiptKey = req.file.key;
-      } else if (req.file.filename) {
-        receiptUrl = `/uploads/${req.file.filename}`;
-        receiptKey = req.file.filename;
-      }
+      const uploaded = extractReceiptFromUpload(req.file);
+      uploadedReceiptToRollback = uploaded;
+      receiptUrl = uploaded.receiptUrl;
+      receiptKey = uploaded.receiptKey;
+      oldReceiptToDelete = {
+        receipt_key: existing.receipt_key,
+        receipt_url: existing.receipt_url,
+      };
     } else if (stripReceipt) {
-      await removeStoredReceipt({ receipt_key: existing.receipt_key, receipt_url: existing.receipt_url });
+      oldReceiptToDelete = {
+        receipt_key: existing.receipt_key,
+        receipt_url: existing.receipt_url,
+      };
       receiptUrl = null;
       receiptKey = null;
     }
 
-    await pool.query(
-      `
-      UPDATE reimbursements
-      SET    amount = ?, category = ?, description = ?, date = ?,
-             receipt_url = ?, receipt_key = ?, assigned_manager_id = ?
-      WHERE  id = ?
-    `,
-      [amount, category, description, date, receiptUrl, receiptKey, assignedManagerId, req.params.id]
-    );
+    try {
+      await pool.query(
+        `
+        UPDATE reimbursements
+        SET    amount = ?, category = ?, description = ?, date = ?,
+               receipt_url = ?, receipt_key = ?, assigned_manager_id = ?
+        WHERE  id = ?
+      `,
+        [amount, category, description, date, receiptUrl, receiptKey, assignedManagerId, req.params.id]
+      );
+    } catch (dbErr) {
+      if (uploadedReceiptToRollback?.receiptKey || uploadedReceiptToRollback?.receiptUrl) {
+        await removeStoredReceipt({
+          receipt_key: uploadedReceiptToRollback.receiptKey,
+          receipt_url: uploadedReceiptToRollback.receiptUrl,
+        });
+      }
+      throw dbErr;
+    }
+
+    if (oldReceiptToDelete) {
+      await removeStoredReceipt(oldReceiptToDelete);
+    }
 
     const data = await selectOneWithJoins(req.params.id);
     res.json({ success: true, data });
@@ -461,8 +489,8 @@ router.delete('/:id', protect, restrictTo('employee'), async (req, res, next) =>
       return res.status(400).json({ success: false, message: 'Only pending reimbursements can be deleted.' });
     }
 
-    await removeStoredReceipt({ receipt_key: rows[0].receipt_key, receipt_url: rows[0].receipt_url });
     await pool.query('DELETE FROM reimbursements WHERE id = ?', [req.params.id]);
+    await removeStoredReceipt({ receipt_key: rows[0].receipt_key, receipt_url: rows[0].receipt_url });
     res.json({ success: true, message: 'Deleted successfully.' });
   } catch (err) {
     next(err);

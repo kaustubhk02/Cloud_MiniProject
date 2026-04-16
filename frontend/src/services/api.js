@@ -8,7 +8,7 @@ const baseURL =
 
 const api = axios.create({
   baseURL,
-  headers: { 'Content-Type': 'application/json' },
+  // Don't set Content-Type here - let axios auto-detect (especially for FormData)
 });
 
 // Attach JWT token to every request

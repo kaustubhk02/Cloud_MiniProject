@@ -13,6 +13,9 @@ import AppLayout from '../layouts/AppLayout';
 import Spinner from '../components/Spinner';
 import { CATEGORIES, openReimbursementReceipt, hasReimbursementReceipt } from '../utils/helpers';
 
+const MAX_FILE_SIZE_BYTES = 5 * 1024 * 1024;
+const ALLOWED_FILE_TYPES = new Set(['image/jpeg', 'image/jpg', 'image/png', 'application/pdf']);
+
 const SubmitRequest = () => {
   const { id } = useParams(); // id means edit mode
   const dispatch = useDispatch();
@@ -103,7 +106,20 @@ const SubmitRequest = () => {
     e.preventDefault();
     setDragOver(false);
     const f = e.dataTransfer.files[0];
-    if (f) setFile(f);
+    if (f) handleFileSelected(f);
+  };
+
+  const handleFileSelected = (selectedFile) => {
+    if (!selectedFile) return;
+    if (!ALLOWED_FILE_TYPES.has(selectedFile.type)) {
+      toast.error('Only JPG, PNG, and PDF files are allowed');
+      return;
+    }
+    if (selectedFile.size > MAX_FILE_SIZE_BYTES) {
+      toast.error('File size must be 5MB or less');
+      return;
+    }
+    setFile(selectedFile);
   };
 
   return (
@@ -217,7 +233,7 @@ const SubmitRequest = () => {
 
           {/* File Upload */}
           <div>
-            <label className="label">Attachment <span className="text-surface-400 font-400">(optional)</span></label>
+            <label className="label">Attachment <span className="text-surface-400 font-400">(required)</span></label>
             {id && existingItem && hasReimbursementReceipt(existingItem) && !file && (
               <div className="flex flex-wrap items-center gap-2 mb-3">
                 <button
@@ -231,7 +247,7 @@ const SubmitRequest = () => {
                     }
                   }}
                 >
-                  View current receipt
+                  View / Download current receipt
                 </button>
                 <button
                   type="button"
@@ -260,7 +276,7 @@ const SubmitRequest = () => {
                 type="file"
                 className="hidden"
                 accept=".jpg,.jpeg,.png,.pdf"
-                onChange={(e) => setFile(e.target.files[0])}
+                onChange={(e) => handleFileSelected(e.target.files[0])}
               />
               {file ? (
                 <div className="flex items-center justify-center gap-2 text-sm text-surface-700">
@@ -281,6 +297,7 @@ const SubmitRequest = () => {
                     Drag & drop or <span className="text-brand-600 font-600">browse</span>
                   </p>
                   <p className="text-xs text-surface-400 mt-1">JPG, PNG, PDF up to 5MB</p>
+                  <p className="text-xs text-surface-400 mt-0.5">Stored securely and fetched using time-limited access links</p>
                 </>
               )}
               {id && existingItem && hasReimbursementReceipt(existingItem) && !file && (

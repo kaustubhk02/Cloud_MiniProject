@@ -123,7 +123,7 @@ const MyRequests = () => {
                               }
                             }}
                           >
-                            View
+                            View / Download
                           </button>
                         ) : (
                           <span className="text-xs text-surface-400">—</span>
@@ -186,7 +186,7 @@ const MyRequests = () => {
                         }
                       }}
                     >
-                      View receipt
+                      View / Download receipt
                     </button>
                   )}
                   <div className="flex items-center justify-between">

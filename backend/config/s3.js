@@ -24,6 +24,10 @@ const limits = { fileSize: 5 * 1024 * 1024 };
 
 const bucket = (process.env.S3_BUCKET_NAME || '').trim();
 const region = (process.env.AWS_REGION || '').trim();
+const signedUrlExpirySeconds = Math.min(
+  Math.max(parseInt(String(process.env.S3_SIGNED_URL_EXPIRES_IN || '300'), 10) || 300, 60),
+  3600
+);
 
 /** Set USE_LOCAL_UPLOADS=true to keep files on disk even if bucket/region are set (local dev). */
 const useLocalUploads = process.env.USE_LOCAL_UPLOADS === 'true';
@@ -121,7 +125,7 @@ async function getReceiptAccessUrl({ receipt_key, receipt_url }) {
   if (!receipt_url && !receipt_key) return null;
   if (useS3 && s3 && receipt_key) {
     const cmd = new GetObjectCommand({ Bucket: bucket, Key: receipt_key });
-    return getSignedUrl(s3, cmd, { expiresIn: 300 });
+    return getSignedUrl(s3, cmd, { expiresIn: signedUrlExpirySeconds });
   }
   if (typeof receipt_url === 'string' && /^https?:\/\//i.test(receipt_url)) {
     return receipt_url;

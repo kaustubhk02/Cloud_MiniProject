@@ -1,6 +1,6 @@
 import { useState, useCallback } from 'react';
 import api from '../services/api';
-import { hasReimbursementReceipt, openReimbursementReceipt } from '../utils/helpers';
+import { hasReimbursementReceipt, getReimbursementReceiptUrl } from '../utils/helpers';
 import toast from 'react-hot-toast';
 
 function isImageReceipt(item) {
@@ -28,7 +28,8 @@ export default function ReceiptCell({ item }) {
 
   const open = async () => {
     try {
-      await openReimbursementReceipt(item._id);
+      const url = await getReimbursementReceiptUrl(item._id);
+      window.open(url, '_blank', 'noopener,noreferrer');
     } catch {
       toast.error('Could not open receipt');
     }
@@ -56,7 +57,7 @@ export default function ReceiptCell({ item }) {
         )}
       </button>
       <button type="button" className="text-[10px] text-brand-600 font-600 hover:text-brand-700" onClick={open}>
-        Open
+        View
       </button>
     </div>
   );

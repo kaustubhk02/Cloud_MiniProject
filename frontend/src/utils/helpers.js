@@ -1,13 +1,18 @@
 import api from '../services/api';
 
-/** Opens receipt in a new tab (presigned S3 or local/proxied URL). */
-export async function openReimbursementReceipt(id) {
+/** Gets receipt access URL (presigned S3 or local/proxied URL). */
+export async function getReimbursementReceiptUrl(id) {
   const { data } = await api.get(`/reimbursements/${id}/receipt`);
   if (data?.url) {
-    window.open(data.url, '_blank', 'noopener,noreferrer');
-    return;
+    return data.url;
   }
   throw new Error(data?.message || 'Could not open receipt');
+}
+
+/** Opens receipt in a new tab (presigned S3 or local/proxied URL). */
+export async function openReimbursementReceipt(id) {
+  const url = await getReimbursementReceiptUrl(id);
+  window.open(url, '_blank', 'noopener,noreferrer');
 }
 
 export const hasReimbursementReceipt = (item) =>
